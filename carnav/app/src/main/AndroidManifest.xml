@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Optional CarDash integration (mini music player + volume booster, v0.3).
+         A custom signature-level permission DECLARED BY CarDash
+         (com.moeez.cardash), so it is only granted when both apps are signed
+         with the same key. Without it (or without CarDash) CarNav works
+         normally and the mini player is simply hidden. See MusicHub.kt. -->
+    <uses-permission android:name="com.moeez.cardash.permission.HUB" />
+
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="CarNav"
+        android:theme="@style/Theme.CarNav">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustNothing"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|smallestScreenSize|fontScale|locale|layoutDirection"
+            android:theme="@style/Theme.CarNav">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

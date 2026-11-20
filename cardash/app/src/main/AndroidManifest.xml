@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <!-- Needed to attach the volume-boost effect to the global output mix. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Lets auto-start notice when the driver leaves the car's music screen.
+         Granted via: adb shell appops set com.moeez.cardash GET_USAGE_STATS allow -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Only apps signed with CarDash's key (CarNav) may use the music/booster hub. -->
+    <permission
+        android:name="com.moeez.cardash.permission.HUB"
+        android:protectionLevel="signature" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="CarDash"
+        android:theme="@style/Theme.CarDash">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.CarDash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- This is what lets you set CarDash as the default Home app -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Reads Bluetooth AVRCP media metadata (track, artist, play state)
+             exposed by the head unit's own Bluetooth stack as a MediaSession.
+             Requires the user to manually grant Notification Access once,
+             since this is how non-root apps read other apps' media sessions. -->
+        <service
+            android:name=".NotificationListener"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Music info, transport controls and the booster for CarNav's mini player. -->
+        <provider
+            android:name=".HubProvider"
+            android:authorities="com.moeez.cardash.hub"
+            android:exported="true"
+            android:permission="com.moeez.cardash.permission.HUB" />
+    </application>
+</manifest>
