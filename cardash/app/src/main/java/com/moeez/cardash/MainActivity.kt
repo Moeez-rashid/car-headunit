@@ -1087,28 +1087,38 @@ private fun ColumnScope.NowPlaying(
         OpenCarPlayerLink(width, onOpenCarPlayer)
     }
 
-    // Cover on/off toggle, left edge (mirrors the boost slider on the right).
+    // Cover on/off toggle: a quiet label in the bottom-right corner, in the
+    // same column and style as the BOOST slider's labels so it reads as part
+    // of the screen. Bright + filled dot = on; dim + hollow dot = off.
     // Only shown when the phone is actually sending a cover image.
     if (coverImage != null) {
-        val shape = RoundedCornerShape(vwDp(width, 3f))
-        Box(
+        val tint = if (showCover) Muted60 else Muted35
+        Column(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = vwDp(width, 2.6f))
-                .clip(shape)
-                .background(if (showCover) Fg else BtnBg)
-                .border(1.dp, if (showCover) Fg else BtnBorder, shape)
+                .align(Alignment.BottomEnd)
+                .padding(end = vwDp(width, 2.6f), bottom = vwDp(width, 2.2f))
+                .width(vwDp(width, 5f))
+                .clip(RoundedCornerShape(vwDp(width, 0.8f)))
                 .clickable {
                     showCover = !showCover
                     prefs.edit().putBoolean("show_cover", showCover).apply()
                 }
-                .padding(horizontal = vwDp(width, 1.4f), vertical = vwDp(width, 0.7f))
+                .padding(vertical = vwDp(width, 0.8f)), // bigger tap area, nothing drawn
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val dot = vwDp(width, 0.55f)
+            Box(
+                Modifier
+                    .size(dot)
+                    .clip(CircleShape)
+                    .then(if (showCover) Modifier.background(tint) else Modifier.border(1.dp, tint, CircleShape))
+            )
+            Spacer(Modifier.height(vwDp(width, 0.5f)))
             Text(
                 "COVER",
-                color = if (showCover) Bg else Muted70,
+                color = tint,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = vwSp(width, 0.95f),
+                fontSize = vwSp(width, 0.85f),
                 letterSpacing = vwSp(width, 0.08f)
             )
         }
