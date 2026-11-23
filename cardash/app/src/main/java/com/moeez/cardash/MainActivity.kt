@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -1050,34 +1051,45 @@ private fun ColumnScope.NowPlaying(
         verticalArrangement = Arrangement.Center
     ) {
         if (coverImage != null && showCover) {
-            // ---- Layout A: cover centred, controls spread across the bar ----
+            // ---- Layout A: cover on the left, track info + bar + controls on
+            // its right, the pair centred on screen. Text is left-aligned to
+            // the cover's edge; the prev/next icons line up with the bar ends.
+            val coverSize = vwDp(width, 21f)
+            val infoWidth = vwDp(width, 36f)
+            val iconPad = vwDp(width, 1.04f) // PrevButton/NextButton's own padding
             val shape = RoundedCornerShape(vwDp(width, 0.8f))
-            Image(
-                bitmap = coverImage,
-                contentDescription = "Album cover",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(vwDp(width, 17f))
-                    .clip(shape)
-                    .border(1.dp, BtnBorder, shape)
-            )
-            Spacer(Modifier.height(vwDp(width, 1.4f)))
-            TrackTitle(width, title, sizeVw = 2.4f)
-            Spacer(Modifier.height(vwDp(width, 0.4f)))
-            TrackArtist(width, artist, sizeVw = 1.2f)
-            Spacer(Modifier.height(vwDp(width, 1.5f)))
-            TrackProgress(width, barWidth, fraction, position, duration)
-            Spacer(Modifier.height(vwDp(width, 0.6f)))
-            Row(
-                modifier = Modifier.width(barWidth),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PrevButton(width) { controller.transportControls.skipToPrevious() }
-                PlayPauseButton(width, playing, diameterVw = 4.8f, onClick = togglePlay)
-                NextButton(width) { controller.transportControls.skipToNext() }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    bitmap = coverImage,
+                    contentDescription = "Album cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(coverSize)
+                        .clip(shape)
+                        .border(1.dp, BtnBorder, shape)
+                )
+                Spacer(Modifier.width(vwDp(width, 3.2f)))
+                Column(modifier = Modifier.width(infoWidth)) {
+                    TrackTitle(width, title, sizeVw = 2.5f, start = true)
+                    Spacer(Modifier.height(vwDp(width, 0.4f)))
+                    TrackArtist(width, artist, sizeVw = 1.25f)
+                    Spacer(Modifier.height(vwDp(width, 2f)))
+                    TrackProgress(width, infoWidth, fraction, position, duration)
+                    Spacer(Modifier.height(vwDp(width, 0.8f)))
+                    Row(
+                        modifier = Modifier
+                            .width(infoWidth + iconPad * 2)
+                            .offset(x = -iconPad),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PrevButton(width) { controller.transportControls.skipToPrevious() }
+                        PlayPauseButton(width, playing, diameterVw = 4.8f, onClick = togglePlay)
+                        NextButton(width) { controller.transportControls.skipToNext() }
+                    }
+                }
             }
-            Spacer(Modifier.height(vwDp(width, 1f)))
+            Spacer(Modifier.height(vwDp(width, 1.6f)))
         } else {
             // ---- Layout C (no cover from the phone): the original design ----
             TrackTitle(width, title, sizeVw = 2.92f)
@@ -1138,14 +1150,15 @@ private fun ColumnScope.NowPlaying(
 }
 
 @Composable
-private fun TrackTitle(width: Dp, title: String?, sizeVw: Float) {
+private fun TrackTitle(width: Dp, title: String?, sizeVw: Float, start: Boolean = false) {
     Text(
         text = title ?: "Waiting for track info…",
         color = Fg,
         fontWeight = FontWeight.SemiBold,
         fontSize = vwSp(width, sizeVw),
-        textAlign = TextAlign.Center,
-        maxLines = 1
+        textAlign = if (start) TextAlign.Start else TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
 }
 
@@ -1156,7 +1169,8 @@ private fun TrackArtist(width: Dp, artist: String, sizeVw: Float) {
         color = Muted50,
         fontSize = vwSp(width, sizeVw),
         letterSpacing = vwSp(width, 0.05f),
-        maxLines = 1
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
 }
 
