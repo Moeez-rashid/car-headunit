@@ -313,3 +313,24 @@ What was already tried (section 7 fixes):
   List installed apps:    adb shell pm list packages | findstr moeez
   Is GPS on?              adb shell settings get secure location_providers_allowed
   Reboot the head unit:   adb reboot
+
+
+------------------------------------------------------------------------
+11. CLEANUP DONE ON THE HEAD UNIT (2026-11-23) AND HOW TO UNDO IT
+------------------------------------------------------------------------
+The unit really has about 1 GB of RAM, although it advertises 4 GB.
+To free memory:
+  - Google Play Services and Google Services Framework were DISABLED. This
+    freed about 75 MB of used RAM, and they no longer run in the
+    background. Nothing in use depends on them (Play Store, Google Maps,
+    YouTube and Chrome were already disabled).
+  - UNINSTALLED: Uptodown, Google Maps Go, Street View, OpenLauncher,
+    Music Volume EQ (hr.podlanica) and MapFactor Navigator. This freed
+    about 0.8 GB of storage.
+Undo (if an app ever complains about missing Google Play Services):
+  adb shell pm enable com.google.android.gms
+  adb shell pm enable com.google.android.gsf
+Removed apps can be reinstalled from their APKs (adb install <file>.apk).
+Do NOT disable or uninstall com.hcn.* (radio, CAN bus/steering keys,
+camera), com.auto.hcamera (reverse camera), com.autochips.* (Bluetooth),
+com.android.launcher3 (fallback home screen) or the keyboard.
