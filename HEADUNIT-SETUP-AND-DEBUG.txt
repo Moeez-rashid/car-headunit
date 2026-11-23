@@ -49,7 +49,7 @@ CARDASH  (package: com.moeez.cardash, file: cardash-v16.apk)
     "Usage access" (so it knows if you left the Bluetooth app yourself).
   - Log tag in logcat: CarDash
 
-CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.apk)
+CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.1.apk)
   - Lightweight turn-by-turn navigation for Pakistan, English labels.
   - Map: OpenStreetMap (tile.openstreetmap.de), black-and-white night style.
   - Search: Nominatim (OpenStreetMap). Routing: OSRM
@@ -75,7 +75,7 @@ On the Windows laptop:
   b) The two APK files (copy them from the MacBook's Downloads folder by
      USB stick, Google Drive, WhatsApp to self, etc.):
        cardash-v16.apk
-       carnav-v0.4.apk
+       carnav-v0.4.1.apk
      Put them in the same folder as adb.exe to keep commands short.
      Do NOT use: app-debug.apk (old CarDash), carnav-v0.3.apk,
      carnav-v0.4-debug.apk (test build only).
@@ -112,7 +112,7 @@ Expected: one line with a serial number and the word "device".
 4. INSTALL (ORDER MATTERS: CARDASH FIRST, THEN CARNAV)
 ------------------------------------------------------------------------
   adb install -r cardash-v16.apk
-  adb install -r carnav-v0.4.apk
+  adb install -r carnav-v0.4.1.apk
 
 Each must print "Success". "-r" means update in place and keep settings.
 Older versions already on the unit are replaced automatically.
@@ -219,7 +219,7 @@ D. GPS quality check (IMPORTANT, do once while driving straight, data
       adb uninstall com.moeez.carnav     (or com.moeez.cardash)
     then install again (CarDash before CarNav).
 - CarNav mini player missing: CarDash missing, or installed after CarNav.
-    Run "adb install -r carnav-v0.4.apk" again.
+    Run "adb install -r carnav-v0.4.1.apk" again.
 - CarDash shows no song titles: notification access not granted (step 5.2),
     or the phone's music app isn't sending info. Tap "open the car player
     once". Check: adb shell dumpsys media_session

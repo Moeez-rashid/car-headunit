@@ -60,8 +60,13 @@ class MapBinder(context: Context) {
             // "Shah Jamal"). Shown in black-and-white night colours to match CarDash.
             setTileSource(LATIN_TILES)
             overlayManager.tilesOverlay.setColorFilter(NIGHT_FILTER)
-            overlayManager.tilesOverlay.loadingBackgroundColor = Color.BLACK
-            overlayManager.tilesOverlay.loadingLineColor = Color.rgb(30, 30, 30)
+            // No "still loading" grid: with a transparent colour osmdroid draws
+            // no placeholder at all and the black map background shows. (The
+            // night filter reached the placeholder inconsistently, so it showed
+            // as a glaring white grid whenever tiles were slow, e.g. on weak
+            // Wi-Fi in the car.)
+            overlayManager.tilesOverlay.loadingBackgroundColor = Color.TRANSPARENT
+            overlayManager.tilesOverlay.loadingLineColor = Color.TRANSPARENT
             setMultiTouchControls(true)
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             minZoomLevel = 5.0
