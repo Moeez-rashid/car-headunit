@@ -1,7 +1,7 @@
 CAR HEAD UNIT APPS - SETUP, TESTING AND DEBUGGING GUIDE
 ========================================================
 Version of this guide: 2026-11-23
-Apps covered: CarDash v19 and CarNav v0.4.2
+Apps covered: CarDash v20 and CarNav v0.4.2
 Source code: https://github.com/Moeez-rashid/car-headunit (public)
 
 
@@ -35,13 +35,14 @@ HEAD UNIT
   - Its own Bluetooth music app is com.autochips.bluetooth
     (screen: com.autochips.bluetooth.BtMusicActivity).
 
-CARDASH  (package: com.moeez.cardash, file: cardash-v19.apk)
+CARDASH  (package: com.moeez.cardash, file: cardash-v20.apk)
   - Replaces the home screen (it is a "launcher" / Home app).
   - Idle screen: big clock, NAVIGATION button (opens CarNav), MUSIC button.
-  - Music screen: song title, artist, album cover (if the phone sends one),
-    progress bar, previous / play-pause / next, a vertical BOOST slider on
-    the right (volume booster for the whole car audio), and a small "COVER"
-    label in the bottom-right corner that turns the album cover on/off.
+  - Music screen (default): album cover box on the left, title / artist /
+    progress bar / previous-play-next on the right, vertical BOOST slider at
+    the right edge. The cover box shows a music-note icon until a cover is
+    found online (or if none exists). The small "COVER" label in the
+    bottom-right corner switches to the plain centred screen and back.
   - When a phone connects over Bluetooth, CarDash briefly (about 3 seconds)
     opens the car's own Bluetooth music app so song titles start flowing,
     then comes back. It never starts music by itself.
@@ -82,7 +83,7 @@ On the Windows laptop:
      Check it works:   adb version
   b) The two APK files (copy them from the MacBook's Downloads folder by
      USB stick, Google Drive, WhatsApp to self, etc.):
-       cardash-v19.apk
+       cardash-v20.apk
        carnav-v0.4.2.apk
      Put them in the same folder as adb.exe to keep commands short.
      Do NOT use: app-debug.apk (old CarDash), carnav-v0.3.apk,
@@ -119,7 +120,7 @@ Expected: one line with a serial number and the word "device".
 ------------------------------------------------------------------------
 4. INSTALL (ORDER MATTERS: CARDASH FIRST, THEN CARNAV)
 ------------------------------------------------------------------------
-  adb install -r cardash-v19.apk
+  adb install -r cardash-v20.apk
   adb install -r carnav-v0.4.2.apk
 
 Each must print "Success". "-r" means update in place and keep settings.
@@ -292,7 +293,7 @@ crash block are enough.
 9. BUG REPORT TEMPLATE (fill this in and give it to the owner for Claude)
 ------------------------------------------------------------------------
 --- BUG REPORT FOR CLAUDE ---
-App: CarDash v19 / CarNav v0.4   (pick one)
+App: CarDash v20 / CarNav v0.4   (pick one)
 Test ID from section 6 (e.g. C4):
 What I did, step by step:
 What I expected:

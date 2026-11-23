@@ -24,7 +24,7 @@ import java.text.Normalizer
  * an artist match what's playing; otherwise no cover is shown, which is
  * better than a wrong one.
  *
- * Light on the unit: at most 3 small requests per new song (searches ≈ 2–10 KB,
+ * Light on the unit: at most a few small requests per new song (searches ≈ 2–10 KB,
  * image ≈ 40–70 KB), on a background thread. Covers are kept on disk (capped),
  * so a song heard before needs no network at all.
  */
@@ -44,13 +44,21 @@ object CoverLookup {
             BitmapFactory.decodeFile(file.path)?.let { file.setLastModified(System.currentTimeMillis()); memory.put(key, it); return@withContext it }
         }
         try {
-            val url = bestArtworkUrl(title, artist)
-            if (url == null) {
+            val urls = artworkUrls(title, artist)
+            if (urls.isEmpty()) {
                 misses += key
                 Log.i(TAG, "Online cover for \"$title\": no confident match")
                 return@withContext null
             }
-            val bytes = download(url)
+            // An image server can be unreachable on one network (seen on the
+            // phone hotspot: one CDN node timed out) — try every candidate.
+            var bytes: ByteArray? = null
+            var lastError: Exception? = null
+            for (u in urls) {
+                bytes = try { download(u) } catch (e: Exception) { lastError = e; null }
+                if (bytes != null) break
+            }
+            if (bytes == null) throw lastError ?: java.io.IOException("no image")
             val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@withContext null
             file.writeBytes(bytes)
             trim(dir)
@@ -64,11 +72,24 @@ object CoverLookup {
         }
     }
 
-    /** Deezer first (wider catalogue of small artists), then Apple. */
-    private fun bestArtworkUrl(title: String, artist: String): String? {
+    /** True when the services answered but have no matching song (not a network failure). */
+    fun isKnownMiss(title: String, artist: String) = "${norm(artist)}|${norm(title)}" in misses
+
+    /**
+     * Image URLs for a confident match, best first: Deezer, Deezer via its
+     * second image host, then Apple. Apple is asked even when Deezer matched,
+     * so there is a fallback image if Deezer's image server is unreachable.
+     */
+    private fun artworkUrls(title: String, artist: String): List<String> {
         val primaryArtist = artistNames(artist).firstOrNull() ?: ""
         val term = URLEncoder.encode("$primaryArtist ${cleanTitle(title)}".trim(), "UTF-8")
-        return fromDeezer(term, title, artist) ?: fromItunes(term, title, artist)
+        val out = ArrayList<String>(3)
+        fromDeezer(term, title, artist)?.let { d ->
+            out += d
+            if ("://cdn-images.dzcdn.net/" in d) out += d.replace("://cdn-images.dzcdn.net/", "://e-cdns-images.dzcdn.net/")
+        }
+        try { fromItunes(term, title, artist)?.let { out += it } } catch (e: Exception) { if (out.isEmpty()) throw e }
+        return out
     }
 
     private fun fromDeezer(term: String, title: String, artist: String): String? = try {
@@ -138,7 +159,7 @@ object CoverLookup {
 
     private fun download(url: String): ByteArray {
         val c = URL(url).openConnection() as HttpURLConnection
-        c.connectTimeout = 5_000
+        c.connectTimeout = 4_000
         c.readTimeout = 6_000
         c.setRequestProperty("User-Agent", "CarDash/1.0 (personal car head unit)")
         try {

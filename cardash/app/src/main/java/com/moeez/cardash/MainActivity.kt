@@ -39,6 +39,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1031,7 +1034,13 @@ private fun ColumnScope.NowPlaying(
         onlineCover = null
         val t = title ?: return@LaunchedEffect
         delay(1_500)
-        if (cover == null) onlineCover = CoverLookup.find(context.applicationContext, t, artist)
+        // One retry 20 s later if it failed for network reasons (not "no match").
+        for (attempt in 0..1) {
+            if (cover != null) break
+            onlineCover = CoverLookup.find(context.applicationContext, t, artist)
+            if (onlineCover != null || CoverLookup.isKnownMiss(t, artist)) break
+            if (attempt == 0) delay(20_000)
+        }
     }
     val art = cover ?: onlineCover
     val coverImage = remember(art) { art?.asImageBitmap() }
@@ -1050,18 +1059,19 @@ private fun ColumnScope.NowPlaying(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        if (coverImage != null && showCover) {
+        if (showCover) {
             // ---- Layout A: cover on the left, track info + bar + controls on
             // its right, the pair centred on screen. Text is left-aligned to
             // the cover's edge; the prev/next icons line up with the bar ends.
-            // Sized to fill the space between the back button and the BOOST
-            // slider: 30 + 3.5 + 44 = 77.5% of the width, cover ~300 px high.
-            val coverSize = vwDp(width, 30f)
-            val infoWidth = vwDp(width, 44f)
+            // 26 + 3.2 + 38 = 67% of the width; cover ~265 px on the unit.
+            val coverSize = vwDp(width, 26f)
+            val infoWidth = vwDp(width, 38f)
             val iconPad = vwDp(width, 1.04f) // PrevButton/NextButton's own padding
             val shape = RoundedCornerShape(vwDp(width, 0.8f))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
+                // The song's cover once found; until then (or if there is none)
+                // a quiet music-note placeholder in the same box.
+                if (coverImage != null) Image(
                     bitmap = coverImage,
                     contentDescription = "Album cover",
                     contentScale = ContentScale.Crop,
@@ -1069,15 +1079,22 @@ private fun ColumnScope.NowPlaying(
                         .size(coverSize)
                         .clip(shape)
                         .border(1.dp, BtnBorder, shape)
-                )
-                Spacer(Modifier.width(vwDp(width, 3.5f)))
+                ) else Box(
+                    modifier = Modifier
+                        .size(coverSize)
+                        .clip(shape)
+                        .background(BtnBg)
+                        .border(1.dp, BtnBorder, shape),
+                    contentAlignment = Alignment.Center
+                ) { MusicNoteIcon(size = coverSize * 0.42f, color = Muted40) }
+                Spacer(Modifier.width(vwDp(width, 3.2f)))
                 Column(modifier = Modifier.width(infoWidth)) {
-                    TrackTitle(width, title, sizeVw = 3.3f, start = true)
-                    Spacer(Modifier.height(vwDp(width, 0.5f)))
-                    TrackArtist(width, artist, sizeVw = 1.65f)
-                    Spacer(Modifier.height(vwDp(width, 2.8f)))
-                    TrackProgress(width, infoWidth, fraction, position, duration, scale = 1.25f)
-                    Spacer(Modifier.height(vwDp(width, 1.2f)))
+                    TrackTitle(width, title, sizeVw = 2.8f, start = true)
+                    Spacer(Modifier.height(vwDp(width, 0.4f)))
+                    TrackArtist(width, artist, sizeVw = 1.4f)
+                    Spacer(Modifier.height(vwDp(width, 2.4f)))
+                    TrackProgress(width, infoWidth, fraction, position, duration, scale = 1.05f)
+                    Spacer(Modifier.height(vwDp(width, 1f)))
                     Row(
                         modifier = Modifier
                             .width(infoWidth + iconPad * 2)
@@ -1085,9 +1102,9 @@ private fun ColumnScope.NowPlaying(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        PrevButton(width, iconVw = 2.4f) { controller.transportControls.skipToPrevious() }
-                        PlayPauseButton(width, playing, diameterVw = 6.4f, onClick = togglePlay)
-                        NextButton(width, iconVw = 2.4f) { controller.transportControls.skipToNext() }
+                        PrevButton(width, iconVw = 2.05f) { controller.transportControls.skipToPrevious() }
+                        PlayPauseButton(width, playing, diameterVw = 5.4f, onClick = togglePlay)
+                        NextButton(width, iconVw = 2.05f) { controller.transportControls.skipToNext() }
                     }
                 }
             }
@@ -1115,8 +1132,8 @@ private fun ColumnScope.NowPlaying(
     // Cover on/off toggle: a quiet label in the bottom-right corner, in the
     // same column and style as the BOOST slider's labels so it reads as part
     // of the screen. Bright + filled dot = on; dim + hollow dot = off.
-    // Only shown when the phone is actually sending a cover image.
-    if (coverImage != null) {
+    // Always shown: switches between the cover layout (default) and the plain one.
+    run {
         val tint = if (showCover) Muted60 else Muted35
         Column(
             modifier = Modifier
@@ -1340,6 +1357,24 @@ private fun PrevIcon(size: Dp, color: Color = Fg) = Canvas(Modifier.size(size)) 
     }
     drawPath(tri, color)
     drawRect(color, topLeft = vb(5f, 4f, s), size = Size(3f * s, 16f * s))
+}
+
+/** Music note: the Material "music_note" outline (Apache 2.0) on its 24-unit grid. */
+private val MUSIC_NOTE_PATH by lazy {
+    PathParser().parsePathString(
+        "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
+    ).toPath()
+}
+
+@Composable
+private fun MusicNoteIcon(size: Dp, color: Color = Fg) = Canvas(Modifier.size(size)) {
+    // Scale the path's own coordinates (not the canvas): Android 8's renderer
+    // rasterises a path at its drawn size and then stretches it, which made
+    // a 24-unit path scaled up on the canvas come out blurry.
+    val k = this.size.minDimension / 24f
+    val p = android.graphics.Path(MUSIC_NOTE_PATH.asAndroidPath())
+    p.transform(android.graphics.Matrix().apply { setScale(k, k) })
+    drawPath(p.asComposePath(), color)
 }
 
 @Composable
