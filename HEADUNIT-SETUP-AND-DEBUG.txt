@@ -1,7 +1,7 @@
 CAR HEAD UNIT APPS - SETUP, TESTING AND DEBUGGING GUIDE
 ========================================================
 Version of this guide: 2026-11-23
-Apps covered: CarDash v16 and CarNav v0.4
+Apps covered: CarDash v16 and CarNav v0.4.2
 Source code: https://github.com/Moeez-rashid/car-headunit (public)
 
 
@@ -49,7 +49,7 @@ CARDASH  (package: com.moeez.cardash, file: cardash-v16.apk)
     "Usage access" (so it knows if you left the Bluetooth app yourself).
   - Log tag in logcat: CarDash
 
-CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.1.apk)
+CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.2.apk)
   - Lightweight turn-by-turn navigation for Pakistan, English labels.
   - Map: OpenStreetMap (tile.openstreetmap.de), black-and-white night style.
   - Search: Nominatim (OpenStreetMap). Routing: OSRM
@@ -60,7 +60,10 @@ CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.1.apk)
     for areas already viewed.
   - Small music player + BOOST bar in the bottom-right, which works THROUGH
     CarDash. It is hidden if CarDash is missing or was installed after CarNav.
-  - CarNav does not write its own logs; crashes still show in logcat.
+  - Log tag in logcat: CarNav (network failures for search/routing, e.g.
+    "Route via routing.openstreetmap.de failed: ..."). Crashes also show.
+  - Android 8.1 has no TLS 1.3, and the routing server requires it, so CarNav
+    (from v0.4.2) bundles its own TLS 1.3 support (Conscrypt + OkHttp).
 
 
 ------------------------------------------------------------------------
@@ -75,7 +78,7 @@ On the Windows laptop:
   b) The two APK files (copy them from the MacBook's Downloads folder by
      USB stick, Google Drive, WhatsApp to self, etc.):
        cardash-v16.apk
-       carnav-v0.4.1.apk
+       carnav-v0.4.2.apk
      Put them in the same folder as adb.exe to keep commands short.
      Do NOT use: app-debug.apk (old CarDash), carnav-v0.3.apk,
      carnav-v0.4-debug.apk (test build only).
@@ -112,7 +115,7 @@ Expected: one line with a serial number and the word "device".
 4. INSTALL (ORDER MATTERS: CARDASH FIRST, THEN CARNAV)
 ------------------------------------------------------------------------
   adb install -r cardash-v16.apk
-  adb install -r carnav-v0.4.1.apk
+  adb install -r carnav-v0.4.2.apk
 
 Each must print "Success". "-r" means update in place and keep settings.
 Older versions already on the unit are replaced automatically.
@@ -219,7 +222,7 @@ D. GPS quality check (IMPORTANT, do once while driving straight, data
       adb uninstall com.moeez.carnav     (or com.moeez.cardash)
     then install again (CarDash before CarNav).
 - CarNav mini player missing: CarDash missing, or installed after CarNav.
-    Run "adb install -r carnav-v0.4.1.apk" again.
+    Run "adb install -r carnav-v0.4.2.apk" again.
 - CarDash shows no song titles: notification access not granted (step 5.2),
     or the phone's music app isn't sending info. Tap "open the car player
     once". Check: adb shell dumpsys media_session
@@ -227,6 +230,9 @@ D. GPS quality check (IMPORTANT, do once while driving straight, data
 - "Location permission needed": see step 5 CarNav.2.
 - "Waiting for GPS…" for a long time: be outdoors; the unit's GPS antenna
     may need a few minutes for the first fix. Check section 6D.
+- "Couldn't get a route. Check the internet connection." while search and
+    the map DO work: check carnav_log.txt (section 8) for "Route via ...
+    failed". "SSLHandshakeException" there = TLS problem; report to Claude.
 - "Can't reach the route server — retrying automatically": no internet, or
     the free routing server is down/slow. It retries by itself. This is
     expected behaviour, not a bug, unless the internet definitely works.
@@ -250,6 +256,7 @@ Best method: clear the log, reproduce the problem, then save everything.
   adb logcat -d > full_log.txt
   adb logcat -b crash -d > crash_log.txt
   adb logcat -d -s CarDash > cardash_log.txt
+  adb logcat -d -s CarNav > carnav_log.txt
   adb shell dumpsys package com.moeez.carnav  > carnav_package.txt
   adb shell dumpsys package com.moeez.cardash > cardash_package.txt
 

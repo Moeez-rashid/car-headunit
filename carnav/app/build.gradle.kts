@@ -11,8 +11,10 @@ android {
         applicationId = "com.moeez.carnav"
         minSdk = 24
         targetSdk = 29 // the head unit runs Android 10 (API 29)
-        versionCode = 5
-        versionName = "0.4.1"
+        versionCode = 6
+        versionName = "0.4.2"
+        // Head unit is 32-bit ARM; arm64 kept for the test emulator. Limits the bundled TLS native code.
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }
 
     signingConfigs {
@@ -72,6 +74,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2") // state survives recreation (L3)
     // Map view drawn with plain Canvas — no OpenGL ES 3 needed (the unit only has ES 2).
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+    // TLS 1.3 on Android 8.1 (the head unit): the routing server is TLS 1.3-only. See Http.kt.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.conscrypt:conscrypt-android:2.5.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303") // real org.json for JVM unit tests

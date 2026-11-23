@@ -344,3 +344,10 @@ Unit tests: 32/32 pass (17 from H1 + 15 new). Still open from the audit: M4 (lon
 - Not yet tested in the real car.
 
 Unit tests: **52/52 pass** (32 existing + 20 new in `Phase3Test.kt`).
+
+## Real head unit, first install (2026-11-23)
+- **The unit runs Android 8.1 (API 27), 32-bit ARM**, not Android 10 as assumed. The emulator tests ran on Android 10.
+- **Routing failed on the unit**: "Couldn't get a route". `routing.openstreetmap.de` (and its alias `router.project-osrm.org`) now accepts **TLS 1.3 only**, and Android 8.1's built-in TLS stops at 1.2. The cause was `SSLHandshakeException`, found by adding a `CarNav` log line. The map-tile and search servers still accept TLS 1.2, which is why those worked.
+  - Fix (v0.4.2): `Http.kt`. Search and routing go through OkHttp 4.12 with Conscrypt 2.5.2, which adds TLS 1.3. Certificates are still checked against the system's trusted roots. Native code is limited to the armeabi-v7a and arm64-v8a ABIs. The APK grows from 5.9 to 9.8 MB.
+  - Verified on the unit: a 12 km route came back, and search worked.
+- **v0.4.1**: with slow tiles (weak Wi-Fi), the night filter made osmdroid's loading placeholder a glaring white grid. The placeholder is now transparent.

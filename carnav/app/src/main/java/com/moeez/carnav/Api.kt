@@ -1,6 +1,7 @@
 package com.moeez.carnav
 
 import android.os.SystemClock
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -14,7 +15,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withTimeoutOrNull
-import java.net.HttpURLConnection
+import okhttp3.Call
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.atomic.AtomicReference
@@ -37,6 +38,7 @@ data class Place(val name: String, val detail: String, val location: LatLon)
  * Both ask for an identifying User-Agent and light, personal-scale use.
  */
 object Api {
+    private const val TAG = "CarNav"
     const val USER_AGENT = "CarNav/0.4 (personal in-car navigation app)"
 
     private const val SEARCH_URL = "https://nominatim.openstreetmap.org/search"
@@ -131,6 +133,9 @@ object Api {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                // Logged so a failure on the head unit can be diagnosed with
+                // "adb logcat -s CarNav" (e.g. TLS / certificate problems).
+                Log.w(TAG, "Route via ${URL(server).host} failed: $e", e)
                 lastError = e
             }
         }
@@ -151,22 +156,23 @@ object Api {
         return parseRoute(body)
     }
 
-    private fun get(url: String): String = blockingGet(url, 10_000, 15_000, acceptErrorBody = false, onOpen = {})
+    private fun get(url: String): String =
+        blockingGet(url, 10_000, 15_000, acceptErrorBody = false, onOpen = {})
 
     /**
      * Cancellable HTTP GET: cancelling the coroutine (time limit, trip ended)
-     * closes the connection, so a stalled request can't keep a reroute
+     * cancels the request, so a stalled request can't keep a reroute
      * "in progress" after it has been abandoned.
      */
     private suspend fun httpGet(url: String, connectMs: Int, readMs: Int, acceptErrorBody: Boolean): String =
         coroutineScope {
-            val conn = AtomicReference<HttpURLConnection?>(null)
+            val call = AtomicReference<Call?>(null)
             val watchdog = launch(Dispatchers.IO) {
-                try { awaitCancellation() } finally { conn.get()?.disconnect() }
+                try { awaitCancellation() } finally { call.get()?.cancel() }
             }
             try {
                 runInterruptible(Dispatchers.IO) {
-                    blockingGet(url, connectMs, readMs, acceptErrorBody) { conn.set(it) }
+                    blockingGet(url, connectMs, readMs, acceptErrorBody) { call.set(it) }
                 }
             } finally {
                 watchdog.cancel()
@@ -178,26 +184,16 @@ object Api {
         connectMs: Int,
         readMs: Int,
         acceptErrorBody: Boolean,
-        onOpen: (HttpURLConnection) -> Unit
+        onOpen: (Call) -> Unit
     ): String {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        onOpen(conn)
-        conn.setRequestProperty("User-Agent", USER_AGENT)
-        conn.connectTimeout = connectMs
-        conn.readTimeout = readMs
-        try {
-            val code = conn.responseCode
-            if (code in 200..299) return conn.inputStream.bufferedReader().use { it.readText() }
-            // OSRM answers "no route" / "no road near this point" with HTTP 400
-            // and a JSON body: let the parser read the code. 5xx / 429 = server trouble.
-            if (acceptErrorBody && code in 400..499 && code != 429) {
-                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
-                if (!err.isNullOrBlank()) return err
-            }
-            throw java.io.IOException("HTTP $code from ${URL(url).host}")
-        } finally {
-            conn.disconnect()
-        }
+        val call = Http.newCall(url, connectMs, readMs)
+        onOpen(call)
+        val r = Http.execute(call)
+        if (r.code in 200..299) return r.body
+        // OSRM answers "no route" / "no road near this point" with HTTP 400
+        // and a JSON body: let the parser read the code. 5xx / 429 = server trouble.
+        if (acceptErrorBody && r.code in 400..499 && r.code != 429 && r.body.isNotBlank()) return r.body
+        throw java.io.IOException("HTTP ${r.code} from ${URL(url).host}")
     }
 
     // ---- Parsing (pure, unit-tested) -------------------------------------
