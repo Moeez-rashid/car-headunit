@@ -1,0 +1,308 @@
+CAR HEAD UNIT APPS - SETUP, TESTING AND DEBUGGING GUIDE
+========================================================
+Version of this guide: 2026-11-23
+Apps covered: CarDash v16 and CarNav v0.4
+Source code: https://github.com/Moeez-rashid/car-headunit (public)
+
+
+------------------------------------------------------------------------
+0. NOTE FOR THE AI ASSISTANT READING THIS (ChatGPT or any other)
+------------------------------------------------------------------------
+You are helping the owner install two Android apps on his car's head unit
+from a Windows laptop and test them. The apps were written by Claude (another
+AI) on a MacBook. Claude cannot see the car, the laptop or the head unit.
+
+Your job:
+  1. Walk the owner through sections 2-6 step by step, one command at a time.
+  2. If something goes wrong, use section 7 (known problems) first.
+  3. If it is a real bug in the apps, do NOT try to rewrite the apps' code.
+     Instead, collect the evidence in section 8 and fill in the BUG REPORT
+     TEMPLATE in section 9. The owner will paste that report to Claude, who
+     will fix the code and produce a new APK.
+  4. Never suggest uninstalling an app unless section 7 says so. Uninstalling
+     deletes its settings (recent destinations, permissions, default home app).
+  5. The owner is on Windows. Use PowerShell or Command Prompt syntax
+     (findstr, not grep). Run adb from the folder that holds the APK files,
+     or give the full path to each APK.
+
+
+------------------------------------------------------------------------
+1. WHAT THE APPS ARE
+------------------------------------------------------------------------
+HEAD UNIT
+  - Aftermarket Android car head unit, chipset AC8227L, Android 10 (API 29),
+    screen 1024x600, OpenGL ES 2.0 only.
+  - Its own Bluetooth music app is com.autochips.bluetooth
+    (screen: com.autochips.bluetooth.BtMusicActivity).
+
+CARDASH  (package: com.moeez.cardash, file: cardash-v16.apk)
+  - Replaces the home screen (it is a "launcher" / Home app).
+  - Idle screen: big clock, NAVIGATION button (opens CarNav), MUSIC button.
+  - Music screen: song title, artist, album cover (if the phone sends one),
+    progress bar, previous / play-pause / next, a vertical BOOST slider on
+    the right (volume booster for the whole car audio), and a small "COVER"
+    label in the bottom-right corner that turns the album cover on/off.
+  - When a phone connects over Bluetooth, CarDash briefly (about 3 seconds)
+    opens the car's own Bluetooth music app so song titles start flowing,
+    then comes back. It never starts music by itself.
+  - Needs: "Notification access" (to read song info), and optionally
+    "Usage access" (so it knows if you left the Bluetooth app yourself).
+  - Log tag in logcat: CarDash
+
+CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.apk)
+  - Lightweight turn-by-turn navigation for Pakistan, English labels.
+  - Map: OpenStreetMap (tile.openstreetmap.de), black-and-white night style.
+  - Search: Nominatim (OpenStreetMap). Routing: OSRM
+    (routing.openstreetmap.de, fallback router.project-osrm.org - note both
+    are actually the same server).
+  - Needs: location permission, GPS switched on, internet (phone hotspot or
+    the unit's own data) for search and routing. The map works offline only
+    for areas already viewed.
+  - Small music player + BOOST bar in the bottom-right, which works THROUGH
+    CarDash. It is hidden if CarDash is missing or was installed after CarNav.
+  - CarNav does not write its own logs; crashes still show in logcat.
+
+
+------------------------------------------------------------------------
+2. WHAT TO DOWNLOAD / HAVE READY
+------------------------------------------------------------------------
+On the Windows laptop:
+  a) Android SDK Platform-Tools (contains adb.exe). Free, from Google:
+       https://developer.android.com/tools/releases/platform-tools
+     Download "SDK Platform-Tools for Windows", unzip, e.g. to C:\platform-tools
+     Then either open PowerShell in that folder, or add it to PATH.
+     Check it works:   adb version
+  b) The two APK files (copy them from the MacBook's Downloads folder by
+     USB stick, Google Drive, WhatsApp to self, etc.):
+       cardash-v16.apk
+       carnav-v0.4.apk
+     Put them in the same folder as adb.exe to keep commands short.
+     Do NOT use: app-debug.apk (old CarDash), carnav-v0.3.apk,
+     carnav-v0.4-debug.apk (test build only).
+  c) A USB cable that connects the laptop to the head unit's USB port
+     (the same way it was connected before), OR the head unit and laptop on
+     the same Wi-Fi if the unit supports wireless adb.
+  d) Optional: if Windows does not see the device, the "Google USB Driver"
+     or the head unit maker's driver may be needed.
+
+On the head unit:
+  - Developer options and USB debugging enabled. (Settings > About >
+    tap "Build number" 7 times, then Settings > Developer options >
+    USB debugging ON.) Many head units hide this under a factory/settings
+    password; it was already done before, so it should still be on.
+
+Phone:
+  - Paired with the head unit over Bluetooth, for the music tests.
+  - Mobile hotspot, if the head unit has no SIM, for CarNav search/routing.
+
+
+------------------------------------------------------------------------
+3. CONNECT THE LAPTOP TO THE HEAD UNIT
+------------------------------------------------------------------------
+  adb devices
+Expected: one line with a serial number and the word "device".
+  - "unauthorized"  -> look at the head unit screen and tap "Allow" on the
+                       USB debugging prompt (tick "Always allow").
+  - nothing listed  -> check cable/port, USB debugging, drivers (section 2d).
+  - Wireless option (only if the unit supports it):
+        adb connect <head-unit-IP>:5555
+
+
+------------------------------------------------------------------------
+4. INSTALL (ORDER MATTERS: CARDASH FIRST, THEN CARNAV)
+------------------------------------------------------------------------
+  adb install -r cardash-v16.apk
+  adb install -r carnav-v0.4.apk
+
+Each must print "Success". "-r" means update in place and keep settings.
+Older versions already on the unit are replaced automatically.
+
+Why the order matters: CarNav's mini music player uses a permission that
+CarDash creates. Android only grants it if CarDash is already installed when
+CarNav is installed. If installed the wrong way round, just run the CarNav
+install command again.
+
+Check what is installed:
+  adb shell dumpsys package com.moeez.cardash | findstr versionName
+  adb shell dumpsys package com.moeez.carnav  | findstr "versionName HUB"
+Expected: CarDash versionName=1.0, CarNav versionName=0.4,
+and "com.moeez.cardash.permission.HUB: granted=true".
+
+
+------------------------------------------------------------------------
+5. FIRST-TIME SETUP ON THE HEAD UNIT (only if not already done)
+------------------------------------------------------------------------
+CarDash:
+  1. Press the Home button; if Android asks which Home app, choose CarDash
+     and "Always". (Or Settings > Apps > Default apps > Home app > CarDash.)
+  2. Notification access (needed for song titles):
+     Open CarDash's music screen; if it shows a "Grant Notification Access"
+     button, tap it and switch CarDash ON. Or from the laptop:
+       adb shell cmd notification allow_listener com.moeez.cardash/com.moeez.cardash.NotificationListener
+  3. Usage access (optional, recommended):
+       adb shell appops set com.moeez.cardash GET_USAGE_STATS allow
+
+CarNav:
+  1. Open CarNav from CarDash's NAVIGATION button.
+  2. Allow location when asked ("Allow only while using the app" is fine).
+     If the prompt never appears:
+       adb shell pm grant com.moeez.carnav android.permission.ACCESS_FINE_LOCATION
+  3. Make sure Location/GPS is ON in the head unit's settings.
+
+
+------------------------------------------------------------------------
+6. TEST CHECKLIST
+------------------------------------------------------------------------
+Do the parked tests first. Driving tests must be SUPERVISED: a second person
+watches the screen. The driver must not operate the apps while driving.
+Write down PASS / FAIL for each line. For any FAIL, go to section 8.
+
+A. CarDash (parked)
+  A1. Home screen shows the clock, NAVIGATION and MUSIC.
+  A2. Connect the phone by Bluetooth. Within a few seconds the car's own
+      Bluetooth music screen opens briefly (~3 s) and CarDash comes back.
+      Music must NOT start playing by itself.
+  A3. Start music on the phone. CarDash music screen shows the song title
+      and artist, moving progress bar; prev / pause / next work.
+  A4. If the phone sends album art, the cover shows, and the small "COVER"
+      label is in the bottom-right corner under the BOOST slider. Tapping it
+      hides/shows the cover (dot filled = on, hollow = off).
+  A5. BOOST slider: drag up = louder, bottom = OFF. Audible difference.
+  A6. Tap "Music not starting? Tap to open the car player once" - opens the
+      car's Bluetooth app.
+
+B. CarNav (parked)
+  B1. Opens on a black-and-white map; your position arrow appears within
+      ~1 minute outdoors (first GPS fix can be slow). Before that it says
+      "Waiting for GPS…".
+  B2. Map street names are in English.
+  B3. "Where to?" > type a place (e.g. "Liberty Market") > GO. Results
+      appear. Reopening search keeps the old text selected; typing replaces it.
+  B4. Tap a result > route preview with time, distance, arrival time > START.
+  B5. Bottom-right mini player shows the song and a BOOST bar; play/pause
+      and boost work and match CarDash.
+  B6. With internet off, search shows "Couldn't search. Check the internet
+      connection and press GO to try again." and that message stays.
+
+C. CarNav (supervised drive, short known route)
+  C1. Turn arrow + distance count down correctly; instruction text is
+      English and matches the real road.
+  C2. Deliberately miss a turn: within a few seconds "Off route" +
+      "Finding a new route…", then new directions.
+  C3. Turn mobile data/hotspot off for a minute while driving and leave the
+      route: expect "Off route" / "Can't reach the route server — retrying
+      automatically" and a straight-line distance ("… · direct"). Turn data
+      back on: new route within seconds.
+  C4. U-turn on a divided road (common in Lahore): directions stay correct,
+      no jumping to the other side of the road, no early "You've arrived".
+  C5. Arrival: "You've arrived" appears once, at the destination.
+  C6. Press Home mid-trip, open CarNav again: trip still running.
+  C7. Kill CarNav mid-trip (or turn the car off and on), reopen: shows
+      "Resuming trip to …" and then directions again.
+
+D. GPS quality check (IMPORTANT, do once while driving straight, data
+   needed by Claude). While moving, the passenger runs:
+     adb shell dumpsys location > location.txt
+   Open location.txt, find the line starting "gps: Location[gps" under
+   "Last Known Locations". Report its "hAcc=", "vel=" and "bear=" values.
+   (Good: hAcc under 20, vel above 0 while moving, bear changing with the
+   road direction. CarNav uses bear/vel to tell the two sides of a divided
+   road apart.)
+
+
+------------------------------------------------------------------------
+7. KNOWN PROBLEMS AND QUICK FIXES (check these before reporting a bug)
+------------------------------------------------------------------------
+- "INSTALL_FAILED_UPDATE_INCOMPATIBLE" / "signatures do not match":
+    The copy on the unit was signed with a different key. Report to Claude
+    first. Last resort (loses that app's settings):
+      adb uninstall com.moeez.carnav     (or com.moeez.cardash)
+    then install again (CarDash before CarNav).
+- CarNav mini player missing: CarDash missing, or installed after CarNav.
+    Run "adb install -r carnav-v0.4.apk" again.
+- CarDash shows no song titles: notification access not granted (step 5.2),
+    or the phone's music app isn't sending info. Tap "open the car player
+    once". Check: adb shell dumpsys media_session
+- "Location is off — turn it on in Settings": GPS switched off on the unit.
+- "Location permission needed": see step 5 CarNav.2.
+- "Waiting for GPS…" for a long time: be outdoors; the unit's GPS antenna
+    may need a few minutes for the first fix. Check section 6D.
+- "Can't reach the route server — retrying automatically": no internet, or
+    the free routing server is down/slow. It retries by itself. This is
+    expected behaviour, not a bug, unless the internet definitely works.
+- "No driving route from here yet — will try again": the routing server
+    answered that no road route exists from the current point (e.g. inside a
+    private area). It retries every 30 s as you move.
+- "… · direct" distance can look very small on a divided road (straight-line
+    distance to the other carriageway). Expected.
+- Pressing Back while navigating sends CarNav to the background on purpose
+    (it does not end the trip). Use END to stop.
+- Want the old home screen back: Settings > Apps > Default apps > Home app.
+
+
+------------------------------------------------------------------------
+8. HOW TO COLLECT EVIDENCE WHEN SOMETHING GOES WRONG
+------------------------------------------------------------------------
+Best method: clear the log, reproduce the problem, then save everything.
+
+  adb logcat -c
+  (now make the problem happen again on the head unit)
+  adb logcat -d > full_log.txt
+  adb logcat -b crash -d > crash_log.txt
+  adb logcat -d -s CarDash > cardash_log.txt
+  adb shell dumpsys package com.moeez.carnav  > carnav_package.txt
+  adb shell dumpsys package com.moeez.cardash > cardash_package.txt
+
+Extra, depending on the problem:
+  GPS / navigation:  adb shell dumpsys location > location.txt
+  Music / titles:    adb shell dumpsys media_session > media.txt
+  Bluetooth:         adb shell dumpsys bluetooth_manager > bt.txt
+  Screenshot (do NOT use ">" in PowerShell for images, it corrupts them):
+                     adb shell screencap -p /sdcard/screen.png
+                     adb pull /sdcard/screen.png
+  Head unit info:    adb shell getprop ro.build.version.release
+                     adb shell getprop ro.product.model
+
+What to look for in full_log.txt (findstr examples):
+  findstr /i "FATAL AndroidRuntime" full_log.txt      -> app crashes
+  findstr /i "ANR" full_log.txt                       -> app froze
+  findstr /i "carnav cardash" full_log.txt            -> lines about the apps
+  findstr /i "Boost" cardash_log.txt                  -> booster on/off and
+       which method (DynamicsProcessing or LoudnessEnhancer)
+
+When sending logs to Claude, include the FATAL EXCEPTION block in full
+(about 30 lines starting at "FATAL EXCEPTION") and any lines mentioning
+com.moeez. Do not paste the whole log if it is huge; filtered lines plus the
+crash block are enough.
+
+
+------------------------------------------------------------------------
+9. BUG REPORT TEMPLATE (fill this in and give it to the owner for Claude)
+------------------------------------------------------------------------
+--- BUG REPORT FOR CLAUDE ---
+App: CarDash v16 / CarNav v0.4   (pick one)
+Test ID from section 6 (e.g. C4):
+What I did, step by step:
+What I expected:
+What actually happened (exact on-screen text, in quotes):
+Happens every time / sometimes / once:
+Was the car moving? Internet on? GPS on? Phone connected by Bluetooth?
+Location (area/road, e.g. "Main Boulevard Gulberg U-turn near Liberty"):
+Crash or freeze? (yes/no) Paste the FATAL EXCEPTION block:
+Relevant log lines (com.moeez / CarDash tag):
+GPS line from section 6D (hAcc, vel, bear), if a navigation problem:
+Screenshot attached? (yes/no)
+Head unit Android version / model (from section 8):
+What was already tried (section 7 fixes):
+--- END ---
+
+
+------------------------------------------------------------------------
+10. USEFUL EXTRA COMMANDS
+------------------------------------------------------------------------
+  Open CarNav:            adb shell am start -n com.moeez.carnav/.MainActivity
+  Open CarDash:           adb shell am start -n com.moeez.cardash/.MainActivity
+  Force-close an app:     adb shell am force-stop com.moeez.carnav
+  List installed apps:    adb shell pm list packages | findstr moeez
+  Is GPS on?              adb shell settings get secure location_providers_allowed
+  Reboot the head unit:   adb reboot
