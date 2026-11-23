@@ -25,7 +25,7 @@ import java.text.Normalizer
  * better than a wrong one.
  *
  * Light on the unit: at most 3 small requests per new song (searches ≈ 2–10 KB,
- * image ≈ 20–30 KB), on a background thread. Covers are kept on disk (capped),
+ * image ≈ 40–70 KB), on a background thread. Covers are kept on disk (capped),
  * so a song heard before needs no network at all.
  */
 object CoverLookup {
@@ -79,7 +79,7 @@ object CoverLookup {
             val r = data.getJSONObject(i)
             val a = r.optJSONObject("artist")?.optString("name").orEmpty()
             if (matches(title, artist, r.optString("title"), a)) {
-                url = r.optJSONObject("album")?.optString("cover_medium")?.takeIf { it.startsWith("https://") }
+                url = r.optJSONObject("album")?.optString("cover_big")?.takeIf { it.startsWith("https://") }
                 if (url != null) break
             }
         }
@@ -95,7 +95,7 @@ object CoverLookup {
             val r = results.getJSONObject(i)
             if (matches(title, artist, r.optString("trackName"), r.optString("artistName"))) {
                 val small = r.optString("artworkUrl100").ifBlank { return null }
-                return small.replace("100x100bb", "300x300bb") // enough for a 17%-of-width square
+                return small.replace("100x100bb", "500x500bb") // the cover is ~300 px on screen
             }
         }
         return null

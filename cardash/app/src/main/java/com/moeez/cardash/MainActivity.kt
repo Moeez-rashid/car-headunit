@@ -1054,8 +1054,10 @@ private fun ColumnScope.NowPlaying(
             // ---- Layout A: cover on the left, track info + bar + controls on
             // its right, the pair centred on screen. Text is left-aligned to
             // the cover's edge; the prev/next icons line up with the bar ends.
-            val coverSize = vwDp(width, 21f)
-            val infoWidth = vwDp(width, 36f)
+            // Sized to fill the space between the back button and the BOOST
+            // slider: 30 + 3.5 + 44 = 77.5% of the width, cover ~300 px high.
+            val coverSize = vwDp(width, 30f)
+            val infoWidth = vwDp(width, 44f)
             val iconPad = vwDp(width, 1.04f) // PrevButton/NextButton's own padding
             val shape = RoundedCornerShape(vwDp(width, 0.8f))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1068,14 +1070,14 @@ private fun ColumnScope.NowPlaying(
                         .clip(shape)
                         .border(1.dp, BtnBorder, shape)
                 )
-                Spacer(Modifier.width(vwDp(width, 3.2f)))
+                Spacer(Modifier.width(vwDp(width, 3.5f)))
                 Column(modifier = Modifier.width(infoWidth)) {
-                    TrackTitle(width, title, sizeVw = 2.5f, start = true)
-                    Spacer(Modifier.height(vwDp(width, 0.4f)))
-                    TrackArtist(width, artist, sizeVw = 1.25f)
-                    Spacer(Modifier.height(vwDp(width, 2f)))
-                    TrackProgress(width, infoWidth, fraction, position, duration)
-                    Spacer(Modifier.height(vwDp(width, 0.8f)))
+                    TrackTitle(width, title, sizeVw = 3.3f, start = true)
+                    Spacer(Modifier.height(vwDp(width, 0.5f)))
+                    TrackArtist(width, artist, sizeVw = 1.65f)
+                    Spacer(Modifier.height(vwDp(width, 2.8f)))
+                    TrackProgress(width, infoWidth, fraction, position, duration, scale = 1.25f)
+                    Spacer(Modifier.height(vwDp(width, 1.2f)))
                     Row(
                         modifier = Modifier
                             .width(infoWidth + iconPad * 2)
@@ -1083,9 +1085,9 @@ private fun ColumnScope.NowPlaying(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        PrevButton(width) { controller.transportControls.skipToPrevious() }
-                        PlayPauseButton(width, playing, diameterVw = 4.8f, onClick = togglePlay)
-                        NextButton(width) { controller.transportControls.skipToNext() }
+                        PrevButton(width, iconVw = 2.4f) { controller.transportControls.skipToPrevious() }
+                        PlayPauseButton(width, playing, diameterVw = 6.4f, onClick = togglePlay)
+                        NextButton(width, iconVw = 2.4f) { controller.transportControls.skipToNext() }
                     }
                 }
             }
@@ -1175,12 +1177,12 @@ private fun TrackArtist(width: Dp, artist: String, sizeVw: Float) {
 }
 
 @Composable
-private fun TrackProgress(width: Dp, barWidth: Dp, fraction: Float, position: Long, duration: Long) {
+private fun TrackProgress(width: Dp, barWidth: Dp, fraction: Float, position: Long, duration: Long, scale: Float = 1f) {
     Column(modifier = Modifier.width(barWidth)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(vwDp(width, 0.26f).coerceAtLeast(3.dp))
+                .height(vwDp(width, 0.26f * scale).coerceAtLeast(3.dp))
                 .clip(RoundedCornerShape(vwDp(width, 0.2f)))
                 .background(Muted15)
         ) {
@@ -1194,36 +1196,38 @@ private fun TrackProgress(width: Dp, barWidth: Dp, fraction: Float, position: Lo
         }
         Spacer(Modifier.height(vwDp(width, 0.63f)))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(fmtTime(position), color = Muted40, fontSize = vwSp(width, 0.94f))
-            Text(fmtTime(duration), color = Muted40, fontSize = vwSp(width, 0.94f))
+            Text(fmtTime(position), color = Muted40, fontSize = vwSp(width, 0.94f * scale))
+            Text(fmtTime(duration), color = Muted40, fontSize = vwSp(width, 0.94f * scale))
         }
     }
 }
 
 @Composable
-private fun PrevButton(width: Dp, onClick: () -> Unit) {
+private fun PrevButton(width: Dp, iconVw: Float = 1.77f, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(vwDp(width, 1.04f))
-    ) { PrevIcon(size = vwDp(width, 1.77f)) }
+    ) { PrevIcon(size = vwDp(width, iconVw)) }
 }
 
 @Composable
-private fun NextButton(width: Dp, onClick: () -> Unit) {
+private fun NextButton(width: Dp, iconVw: Float = 1.77f, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(vwDp(width, 1.04f))
-    ) { NextIcon(size = vwDp(width, 1.77f)) }
+    ) { NextIcon(size = vwDp(width, iconVw)) }
 }
 
 @Composable
 private fun PlayPauseButton(width: Dp, playing: Boolean, diameterVw: Float, onClick: () -> Unit) {
     CircleButton(diameter = vwDp(width, diameterVw), onClick = onClick) {
-        if (playing) PauseIcon(size = vwDp(width, 1.88f)) else PlayIcon(size = vwDp(width, 1.88f))
+        // Icon grows with the button (1.88 at the original 5.42 size).
+        val icon = vwDp(width, 1.88f * (diameterVw / 5.42f).coerceAtLeast(0.88f))
+        if (playing) PauseIcon(size = icon) else PlayIcon(size = icon)
     }
 }
 
