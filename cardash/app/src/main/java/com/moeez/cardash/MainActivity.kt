@@ -1021,7 +1021,18 @@ private fun ColumnScope.NowPlaying(
         }
     }
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val art = cover
+    // The phone's own cover if it sends one; otherwise one looked up online
+    // (this unit's Bluetooth never passes covers on). Waits 1.5 s so skipping
+    // through tracks doesn't fire requests.
+    val context = LocalContext.current
+    var onlineCover by remember { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(title, artist) {
+        onlineCover = null
+        val t = title ?: return@LaunchedEffect
+        delay(1_500)
+        if (cover == null) onlineCover = CoverLookup.find(context.applicationContext, t, artist)
+    }
+    val art = cover ?: onlineCover
     val coverImage = remember(art) { art?.asImageBitmap() }
     val togglePlay = {
         if (playing) controller.transportControls.pause() else controller.transportControls.play()
