@@ -11,8 +11,8 @@ android {
         applicationId = "com.moeez.carnav"
         minSdk = 24
         targetSdk = 29 // the head unit runs Android 10 (API 29)
-        versionCode = 6
-        versionName = "0.4.2"
+        versionCode = 7
+        versionName = "0.4.3"
         // Head unit is 32-bit ARM; arm64 kept for the test emulator. Limits the bundled TLS native code.
         ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }

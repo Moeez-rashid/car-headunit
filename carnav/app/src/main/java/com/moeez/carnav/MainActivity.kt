@@ -95,6 +95,8 @@ class MainActivity : ComponentActivity() {
                 model, binder,
                 onRequestPermission = { requestPermission() },
                 onOpenAppSettings = { openAppSettings() },
+                onGoHome = { goHome() },
+                onExit = { exitCompletely() },
                 hub = vm.musicHub
             )
         }
@@ -176,6 +178,32 @@ class MainActivity : ComponentActivity() {
         // willing to show the dialog. False after asking = "Don't ask again".
         val canAsk = !asked || shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
         model.permission = if (canAsk) LocationPermission.NEEDED else LocationPermission.BLOCKED
+    }
+
+    /**
+     * Closes CarNav completely: stops GPS, forgets any unstarted route, removes
+     * the task and ends the process so it uses no memory until opened again.
+     * (Only offered when no trip is running.)
+     */
+    private fun exitCompletely() {
+        model.end()
+        unsubscribe()
+        finishAndRemoveTask()
+        android.os.Handler(Looper.getMainLooper()).postDelayed({
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }, 400)
+    }
+
+    /** Shows the home screen (CarDash on the head unit); navigation keeps running. */
+    private fun goHome() {
+        try {
+            startActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            moveTaskToBack(true)
+        }
     }
 
     private fun openAppSettings() {

@@ -116,6 +116,15 @@ private const val KICK_HOLD_MS = 3_000L
 //   adb shell appops set com.moeez.cardash GET_USAGE_STATS allow
 private const val TAG = "CarDash"
 
+/** Foreground apps that don't mean "the driver left the car's music screen". */
+private val IGNORED_FOREGROUND_PREFIXES = listOf(
+    "com.autochips.",        // the car's Bluetooth / music app, any of its screens
+    "com.android.launcher3", // stock launcher (the unit shows it during boot)
+    "com.android.systemui",
+    "com.hcn.",              // the unit's own radio / CAN / overlay apps
+    "android"                // system dialogs
+)
+
 /** Process-wide so activity recreation doesn't re-trigger a kick. */
 private object AutoStart {
     val processStart: Long = SystemClock.elapsedRealtime()
@@ -413,7 +422,10 @@ class MainActivity : ComponentActivity() {
         val connectDue = connected && !AutoStart.kickedThisConnection
         if (bootDue || connectDue) {
             AutoStart.bootKickDone = true
-            kickStart(if (connected) "phone connected" else "car started, waiting for phone")
+            kickStart(
+                if (connected) "phone connected" else "car started, waiting for phone",
+                atBoot = bootDue
+            )
         }
     }
 
@@ -422,9 +434,10 @@ class MainActivity : ComponentActivity() {
      * connect, holds KICK_HOLD_MS more so the unit loads track info, then
      * returns to CarDash on the music screen. No auto-play.
      */
-    private fun kickStart(reason: String) {
+    private fun kickStart(reason: String, atBoot: Boolean = false) {
         AutoStart.kickInProgress = true
         Log.i(TAG, "Auto-start: $reason -> opening BT music")
+        val openedWall = System.currentTimeMillis()
         openCarMusic()
 
         val opened = SystemClock.elapsedRealtime()
@@ -433,7 +446,9 @@ class MainActivity : ComponentActivity() {
             override fun run() {
                 val now = SystemClock.elapsedRealtime()
                 // Give the music screen a moment to come up before checking.
-                if (now - opened > 1_500L && userLeftCarMusic()) {
+                // Never at power-on: the unit brings its own screens up then,
+                // and CarDash must always come back (it's the home screen).
+                if (!atBoot && now - opened > 1_500L && userLeftCarMusic(openedWall)) {
                     Log.i(TAG, "Auto-start: user left the car music screen, cancelling return")
                     // Don't re-trigger for this connection; the manual link still works.
                     AutoStart.kickedThisConnection = isBluetoothAudioConnected()
@@ -454,33 +469,38 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * True when something other than the car's music screen (or CarDash) is in
-     * front — i.e. the driver navigated away themselves. Returns false when
-     * usage access hasn't been granted, so behaviour falls back to the timer.
+     * True only when the driver clearly went to ANOTHER app after CarDash opened
+     * the car's music screen (e.g. Settings to pair a friend's phone). Screens
+     * of the car's own Bluetooth app (whatever its internal activity names),
+     * the stock launcher, the system bar and the unit's built-in hcn apps don't
+     * count. Returns false without usage access, so the timer return applies.
+     *
+     * (v16-v20 compared the exact activity class against BtMusicActivity over
+     * the last 60 s; on the real unit that misfired and CarDash stayed behind
+     * the car's music app — reported 2026-11-26.)
      */
-    private fun userLeftCarMusic(): Boolean {
-        val fg = foregroundActivity() ?: return false
-        return fg.first != packageName && fg.second != CAR_MUSIC_ACTIVITY
+    private fun userLeftCarMusic(sinceWallMs: Long): Boolean {
+        val pkg = lastForegroundPackageSince(sinceWallMs) ?: return false
+        val left = pkg != packageName && IGNORED_FOREGROUND_PREFIXES.none { pkg.startsWith(it) }
+        if (left) Log.i(TAG, "Auto-start: foreground went to $pkg")
+        return left
     }
 
-    /** (package, activity class) of the last activity to come to the front. */
-    private fun foregroundActivity(): Pair<String, String>? {
+    /** Package of the last activity that came to the front since [sinceWallMs], or null. */
+    private fun lastForegroundPackageSince(sinceWallMs: Long): String? {
         val usm = getSystemService(USAGE_STATS_SERVICE) as? UsageStatsManager ?: return null
-        val now = System.currentTimeMillis()
         val events = try {
-            usm.queryEvents(now - 60_000L, now)
+            usm.queryEvents(sinceWallMs - 500L, System.currentTimeMillis() + 1_000L)
         } catch (e: Exception) {
             return null
         }
-        var last: Pair<String, String>? = null
+        var last: String? = null
         val e = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(e)
-            if (e.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND && e.className != null) {
-                last = e.packageName to e.className
-            }
+            if (e.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) last = e.packageName
         }
-        return last // null if no permission (queryEvents returns nothing)
+        return last // null without usage access (queryEvents returns nothing)
     }
 
     private fun finishKick(connected: Boolean) {

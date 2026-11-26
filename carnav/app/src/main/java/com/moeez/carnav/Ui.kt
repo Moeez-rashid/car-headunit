@@ -80,6 +80,8 @@ fun CarNavApp(
     binder: MapBinder,
     onRequestPermission: () -> Unit = {},
     onOpenAppSettings: () -> Unit = {},
+    onGoHome: () -> Unit = {},
+    onExit: () -> Unit = {},
     hub: MusicHub? = null
 ) {
     // Push model changes into the map.
@@ -89,6 +91,12 @@ fun CarNavApp(
         if (r != null && model.mode == Mode.PREVIEW) binder.fitRoute(r)
     }
     LaunchedEffect(model.destination) { binder.showDestination(model.destination?.location) }
+    // Driven part of the route disappears behind the car while navigating.
+    LaunchedEffect(model.progress, model.mode) {
+        val r = model.route ?: return@LaunchedEffect
+        val p = model.progress ?: return@LaunchedEffect
+        if (model.mode == Mode.NAVIGATE && !model.offRoute) binder.showRemainingRoute(r, p.along)
+    }
     LaunchedEffect(model.location, model.heading, model.following, model.mode) {
         binder.showPosition(model.location, model.heading)
         val p = model.location ?: return@LaunchedEffect
@@ -135,6 +143,19 @@ fun CarNavApp(
                 if (!model.following && model.location != null && model.mode != Mode.PREVIEW) {
                     RoundButton(s, "◎") { model.following = true }
                 }
+            }
+        }
+
+        // Top-right: × closes CarNav completely (only when no trip is running,
+        // so a trip can't be ended by accident); ‹ goes back to the home
+        // screen (CarDash) and a running trip keeps going.
+        if (model.mode != Mode.SEARCH) {
+            Row(
+                Modifier.align(Alignment.TopEnd).padding(s.dp(2f)),
+                horizontalArrangement = Arrangement.spacedBy(s.dp(1.2f))
+            ) {
+                if (model.mode != Mode.NAVIGATE) RoundButton(s, "×", onExit)
+                RoundButton(s, "‹", onGoHome)
             }
         }
 

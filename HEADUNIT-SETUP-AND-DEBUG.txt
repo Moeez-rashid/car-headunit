@@ -1,7 +1,7 @@
 CAR HEAD UNIT APPS - SETUP, TESTING AND DEBUGGING GUIDE
 ========================================================
 Version of this guide: 2026-11-23
-Apps covered: CarDash v20 and CarNav v0.4.2
+Apps covered: CarDash v21 and CarNav v0.4.3
 Source code: https://github.com/Moeez-rashid/car-headunit (public)
 
 
@@ -35,7 +35,7 @@ HEAD UNIT
   - Its own Bluetooth music app is com.autochips.bluetooth
     (screen: com.autochips.bluetooth.BtMusicActivity).
 
-CARDASH  (package: com.moeez.cardash, file: cardash-v20.apk)
+CARDASH  (package: com.moeez.cardash, file: cardash-v21.apk)
   - Replaces the home screen (it is a "launcher" / Home app).
   - Idle screen: big clock, NAVIGATION button (opens CarNav), MUSIC button.
   - Music screen (default): album cover box on the left, title / artist /
@@ -55,7 +55,7 @@ CARDASH  (package: com.moeez.cardash, file: cardash-v20.apk)
     "Usage access" (so it knows if you left the Bluetooth app yourself).
   - Log tag in logcat: CarDash
 
-CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.2.apk)
+CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.3.apk)
   - Lightweight turn-by-turn navigation for Pakistan, English labels.
   - Map: OpenStreetMap (tile.openstreetmap.de), black-and-white night style.
   - Search: Nominatim (OpenStreetMap). Routing: OSRM
@@ -83,8 +83,8 @@ On the Windows laptop:
      Check it works:   adb version
   b) The two APK files (copy them from the MacBook's Downloads folder by
      USB stick, Google Drive, WhatsApp to self, etc.):
-       cardash-v20.apk
-       carnav-v0.4.2.apk
+       cardash-v21.apk
+       carnav-v0.4.3.apk
      Put them in the same folder as adb.exe to keep commands short.
      Do NOT use: app-debug.apk (old CarDash), carnav-v0.3.apk,
      carnav-v0.4-debug.apk (test build only).
@@ -120,8 +120,8 @@ Expected: one line with a serial number and the word "device".
 ------------------------------------------------------------------------
 4. INSTALL (ORDER MATTERS: CARDASH FIRST, THEN CARNAV)
 ------------------------------------------------------------------------
-  adb install -r cardash-v20.apk
-  adb install -r carnav-v0.4.2.apk
+  adb install -r cardash-v21.apk
+  adb install -r carnav-v0.4.3.apk
 
 Each must print "Success". "-r" means update in place and keep settings.
 Older versions already on the unit are replaced automatically.
@@ -228,7 +228,7 @@ D. GPS quality check (IMPORTANT, do once while driving straight, data
       adb uninstall com.moeez.carnav     (or com.moeez.cardash)
     then install again (CarDash before CarNav).
 - CarNav mini player missing: CarDash missing, or installed after CarNav.
-    Run "adb install -r carnav-v0.4.2.apk" again.
+    Run "adb install -r carnav-v0.4.3.apk" again.
 - CarDash shows no song titles: notification access not granted (step 5.2),
     or the phone's music app isn't sending info. Tap "open the car player
     once". Check: adb shell dumpsys media_session
@@ -293,7 +293,7 @@ crash block are enough.
 9. BUG REPORT TEMPLATE (fill this in and give it to the owner for Claude)
 ------------------------------------------------------------------------
 --- BUG REPORT FOR CLAUDE ---
-App: CarDash v20 / CarNav v0.4   (pick one)
+App: CarDash v21 / CarNav v0.4   (pick one)
 Test ID from section 6 (e.g. C4):
 What I did, step by step:
 What I expected:

@@ -123,7 +123,28 @@ class MapBinder(context: Context) {
         }
     }
 
+    private var trimmedAt = -1.0
+
+    /**
+     * While navigating, hide the part of the route already driven (like Google
+     * Maps): the line starts at the car's matched position on the route.
+     * Redrawn only after 10 m of progress, so it stays cheap on the head unit.
+     */
+    fun showRemainingRoute(route: Route, along: Double) {
+        if (trimmedAt >= 0 && kotlin.math.abs(along - trimmedAt) < 10.0) return
+        trimmedAt = along
+        val pts = ArrayList<GeoPoint>()
+        route.pointAt(along).let { pts += GeoPoint(it.lat, it.lon) }
+        for (i in route.points.indices) {
+            if (route.cumulative[i] > along) pts += GeoPoint(route.points[i].lat, route.points[i].lon)
+        }
+        routeCasing.setPoints(pts)
+        routeLine.setPoints(pts)
+        map.invalidate()
+    }
+
     fun showRoute(route: Route?) {
+        trimmedAt = -1.0
         val pts = route?.points?.map { GeoPoint(it.lat, it.lon) } ?: emptyList()
         routeCasing.setPoints(pts)
         routeLine.setPoints(pts)
