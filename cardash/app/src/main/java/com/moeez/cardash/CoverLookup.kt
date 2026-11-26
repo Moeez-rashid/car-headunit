@@ -34,6 +34,13 @@ object CoverLookup {
     private val memory = LruCache<String, Bitmap>(24)
     private val misses = HashSet<String>() // no match this session: don't ask again
 
+    /** A cover already on the unit (memory or disk) — no network. Null if not saved. */
+    suspend fun cached(context: Context, title: String, artist: String): Bitmap? = withContext(Dispatchers.IO) {
+        val key = "${norm(artist)}|${norm(title)}"
+        memory.get(key) ?: File(File(context.cacheDir, "covers"), sha1(key) + ".jpg").takeIf { it.exists() }
+            ?.let { BitmapFactory.decodeFile(it.path) }?.also { memory.put(key, it) }
+    }
+
     suspend fun find(context: Context, title: String, artist: String): Bitmap? = withContext(Dispatchers.IO) {
         val key = "${norm(artist)}|${norm(title)}"
         memory.get(key)?.let { return@withContext it }

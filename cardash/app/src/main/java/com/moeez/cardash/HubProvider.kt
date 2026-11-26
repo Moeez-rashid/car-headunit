@@ -32,6 +32,7 @@ class HubProvider : ContentProvider() {
         val ctx = context!!.applicationContext
         // The process may have been started just for this call.
         AudioBooster.restoreOnce(ctx)
+        AudioEq.restoreOnce(ctx)
         when (method) {
             "boost" -> extras?.getFloat("value", -1f)?.takeIf { it >= 0f }
                 ?.let { AudioBooster.setStrength(ctx, it) }

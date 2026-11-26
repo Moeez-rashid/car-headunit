@@ -27,6 +27,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -190,6 +197,7 @@ class MainActivity : ComponentActivity() {
             getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
 
         AudioBooster.restoreOnce(applicationContext)
+        AudioEq.restoreOnce(applicationContext)
         syncBoost()
 
         setContent {
@@ -225,6 +233,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AudioBooster.ensure(applicationContext)
+        AudioEq.ensure(applicationContext)
         syncBoost()
         mainHandler.removeCallbacks(autoStartTick)
         mainHandler.post(autoStartTick)
@@ -815,7 +824,174 @@ private fun MusicScreen(
             .align(Alignment.CenterEnd)
             .padding(end = vwDp(width, 2.6f))
     )
+
+    // Equalizer: a quiet "EQ" label bottom-left (mirrors COVER bottom-right);
+    // tapping it opens a small panel over the screen.
+    val ctx = LocalContext.current
+    var eqOpen by remember { mutableStateOf(false) }
+    var eq by remember { mutableStateOf(AudioEq.settings) }
+    CornerToggle(
+        width, "EQ", active = !eq.isFlat,
+        modifier = Modifier.align(Alignment.BottomStart).padding(start = vwDp(width, 2.6f), bottom = vwDp(width, 2.2f))
+    ) { eqOpen = true }
+    if (eqOpen) EqPanel(
+        width, eq,
+        onChange = { eq = it; AudioEq.apply(ctx.applicationContext, it) },
+        onClose = { eqOpen = false }
+    )
   }
+}
+
+/** Quiet corner label with an on/off dot (COVER, EQ). */
+@Composable
+private fun CornerToggle(width: Dp, label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val tint = if (active) Muted60 else Muted35
+    Column(
+        modifier = modifier
+            .width(vwDp(width, 5f))
+            .clip(RoundedCornerShape(vwDp(width, 0.8f)))
+            .clickable { onClick() }
+            .padding(vertical = vwDp(width, 0.8f)),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier
+                .size(vwDp(width, 0.55f))
+                .clip(CircleShape)
+                .then(if (active) Modifier.background(tint) else Modifier.border(1.dp, tint, CircleShape))
+        )
+        Spacer(Modifier.height(vwDp(width, 0.5f)))
+        Text(label, color = tint, fontWeight = FontWeight.SemiBold, fontSize = vwSp(width, 0.85f),
+            letterSpacing = vwSp(width, 0.08f))
+    }
+}
+
+/** Small equalizer card: Bass / Mid / Treble (−12..+12 dB) and Bass Boost (0..100%). */
+@Composable
+private fun EqPanel(width: Dp, eq: AudioEq.Settings, onChange: (AudioEq.Settings) -> Unit, onClose: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Bg.copy(alpha = 0.6f))
+            .pointerInput(Unit) { detectTapGestures { onClose() } },
+        contentAlignment = Alignment.Center
+    ) {
+        val shape = RoundedCornerShape(vwDp(width, 1.4f))
+        Column(
+            Modifier
+                .width(vwDp(width, 46f))
+                .clip(shape)
+                .background(Color(0xFF0D0D0D))
+                .border(1.dp, BtnBorder, shape)
+                .pointerInput(Unit) { detectTapGestures { } } // taps inside don't close
+                .padding(vwDp(width, 2f)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("EQUALIZER", color = Muted60, fontWeight = FontWeight.SemiBold,
+                    fontSize = vwSp(width, 0.95f), letterSpacing = vwSp(width, 0.1f), modifier = Modifier.weight(1f))
+                PanelButton(width, "RESET") { onChange(AudioEq.Settings()) }
+                Spacer(Modifier.width(vwDp(width, 1f)))
+                PanelButton(width, "DONE", filled = true, onClick = onClose)
+            }
+            Spacer(Modifier.height(vwDp(width, 2f)))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                EqSlider(width, "BASS", eq.bass, bipolar = true, valueText = AudioEq.dbLabel(eq.bass)) { onChange(eq.copy(bass = it)) }
+                EqSlider(width, "MID", eq.mid, bipolar = true, valueText = AudioEq.dbLabel(eq.mid)) { onChange(eq.copy(mid = it)) }
+                EqSlider(width, "TREBLE", eq.treble, bipolar = true, valueText = AudioEq.dbLabel(eq.treble)) { onChange(eq.copy(treble = it)) }
+                EqSlider(width, "BASS BOOST", eq.bassBoost, bipolar = false,
+                    valueText = if (eq.bassBoost <= 0f) "OFF" else "${(eq.bassBoost * 100).roundToInt()}%") { onChange(eq.copy(bassBoost = it)) }
+            }
+            if (AudioEq.status == "unsupported" || AudioEq.status == "partial") {
+                Spacer(Modifier.height(vwDp(width, 1f)))
+                Text("Some sound effects aren't available on this unit.", color = Muted45, fontSize = vwSp(width, 0.85f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PanelButton(width: Dp, label: String, filled: Boolean = false, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(vwDp(width, 3f))
+    Box(
+        Modifier
+            .clip(shape)
+            .background(if (filled) Fg else BtnBg)
+            .border(1.dp, if (filled) Fg else BtnBorder, shape)
+            .clickable { onClick() }
+            .padding(horizontal = vwDp(width, 1.6f), vertical = vwDp(width, 0.6f))
+    ) {
+        Text(label, color = if (filled) Bg else Muted70, fontWeight = FontWeight.SemiBold,
+            fontSize = vwSp(width, 0.85f), letterSpacing = vwSp(width, 0.06f))
+    }
+}
+
+/**
+ * Vertical slider in the BOOST style. Bipolar (−1..+1) sliders fill from a
+ * centre mark and snap to 0 near it; others run 0..1 and snap to off at the bottom.
+ */
+@Composable
+private fun EqSlider(width: Dp, label: String, value: Float, bipolar: Boolean, valueText: String, onChange: (Float) -> Unit) {
+    val trackHeight = vwDp(width, 20f)
+    val thumb = vwDp(width, 2.2f)
+    var heightPx by remember { mutableStateOf(1) }
+    val latest by rememberUpdatedState(onChange)
+    fun valueAt(y: Float): Float {
+        val f = (1f - y / heightPx).coerceIn(0f, 1f) // 0 bottom .. 1 top
+        return if (bipolar) {
+            val v = f * 2f - 1f
+            if (kotlin.math.abs(v) < 0.06f) 0f else (v * 20f).roundToInt() / 20f // 5% steps
+        } else {
+            if (f < 0.04f) 0f else (f * 20f).roundToInt() / 20f
+        }
+    }
+    val pos = if (bipolar) (value + 1f) / 2f else value // 0..1 from the bottom
+    Column(Modifier.width(vwDp(width, 9f)), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .onSizeChanged { heightPx = it.height.coerceAtLeast(1) }
+                .pointerInput(Unit) { detectTapGestures { latest(valueAt(it.y)) } }
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(onDragStart = { latest(valueAt(it.y)) }) { change, _ ->
+                        change.consume(); latest(valueAt(change.position.y))
+                    }
+                },
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                Modifier.fillMaxHeight().width(vwDp(width, 0.7f)).clip(RoundedCornerShape(50)).background(Muted15)
+            ) {
+                // Filled part: from the centre (bipolar) or the bottom.
+                val from = if (bipolar) minOf(0.5f, pos) else 0f
+                val to = if (bipolar) maxOf(0.5f, pos) else pos
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = -trackHeight * from)
+                        .fillMaxWidth()
+                        .height(trackHeight * (to - from))
+                        .background(Fg)
+                )
+            }
+            if (bipolar) Box( // centre (0 dB) mark
+                Modifier.align(Alignment.Center).width(vwDp(width, 2f)).height(1.dp).background(Muted35)
+            )
+            Box(
+                Modifier
+                    .offset(y = -(trackHeight - thumb) * pos)
+                    .size(thumb)
+                    .clip(CircleShape)
+                    .background(if (value != 0f) Fg else Bg)
+                    .border(1.dp, if (value != 0f) Fg else BtnBorder, CircleShape)
+            )
+        }
+        Spacer(Modifier.height(vwDp(width, 0.9f)))
+        Text(valueText, color = if (value != 0f) Fg else Muted45, fontWeight = FontWeight.SemiBold, fontSize = vwSp(width, 0.9f))
+        Spacer(Modifier.height(vwDp(width, 0.3f)))
+        Text(label, color = Muted60, fontWeight = FontWeight.SemiBold, fontSize = vwSp(width, 0.8f), letterSpacing = vwSp(width, 0.08f))
+    }
 }
 
 @Composable
@@ -1050,16 +1226,27 @@ private fun ColumnScope.NowPlaying(
     // through tracks doesn't fire requests.
     val context = LocalContext.current
     var onlineCover by remember { mutableStateOf<Bitmap?>(null) }
+    // True while a cover is still being looked up: the box shows a soft pulse
+    // instead of the note, so it doesn't flash "no cover" and then jump.
+    var coverLoading by remember { mutableStateOf(false) }
     LaunchedEffect(title, artist) {
         onlineCover = null
-        val t = title ?: return@LaunchedEffect
-        delay(1_500)
-        // One retry 20 s later if it failed for network reasons (not "no match").
-        for (attempt in 0..1) {
-            if (cover != null) break
-            onlineCover = CoverLookup.find(context.applicationContext, t, artist)
-            if (onlineCover != null || CoverLookup.isKnownMiss(t, artist)) break
-            if (attempt == 0) delay(20_000)
+        val t = title ?: run { coverLoading = false; return@LaunchedEffect }
+        coverLoading = true
+        try {
+            // Covers already saved on the unit show at once, with no wait.
+            CoverLookup.cached(context.applicationContext, t, artist)?.let { onlineCover = it; return@LaunchedEffect }
+            delay(1_500) // skipping through tracks doesn't fire requests
+            // One retry 20 s later if it failed for network reasons (not "no match").
+            for (attempt in 0..1) {
+                if (cover != null) break
+                onlineCover = CoverLookup.find(context.applicationContext, t, artist)
+                if (onlineCover != null || CoverLookup.isKnownMiss(t, artist)) break
+                coverLoading = false // show the note while waiting to retry
+                if (attempt == 0) delay(20_000)
+            }
+        } finally {
+            coverLoading = false
         }
     }
     val art = cover ?: onlineCover
@@ -1091,22 +1278,39 @@ private fun ColumnScope.NowPlaying(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // The song's cover once found; until then (or if there is none)
                 // a quiet music-note placeholder in the same box.
-                if (coverImage != null) Image(
-                    bitmap = coverImage,
-                    contentDescription = "Album cover",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(coverSize)
-                        .clip(shape)
-                        .border(1.dp, BtnBorder, shape)
-                ) else Box(
+                // One box, three calm states that cross-fade: a soft pulse
+                // while the cover is looked up, the cover, or the music note
+                // when there's none.
+                val coverState: Any = coverImage ?: if (coverLoading && cover == null) "loading" else "none"
+                Box(
                     modifier = Modifier
                         .size(coverSize)
                         .clip(shape)
                         .background(BtnBg)
-                        .border(1.dp, BtnBorder, shape),
-                    contentAlignment = Alignment.Center
-                ) { MusicNoteIcon(size = coverSize * 0.42f, color = Muted40) }
+                        .border(1.dp, BtnBorder, shape)
+                ) {
+                    Crossfade(targetState = coverState, animationSpec = tween(350), label = "cover") { st ->
+                        when (st) {
+                            is ImageBitmap -> Image(
+                                bitmap = st,
+                                contentDescription = "Album cover",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            "loading" -> {
+                                val pulse = rememberInfiniteTransition(label = "pulse")
+                                val a by pulse.animateFloat(
+                                    initialValue = 0.03f, targetValue = 0.09f,
+                                    animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "a"
+                                )
+                                Box(Modifier.fillMaxSize().background(Fg.copy(alpha = a)))
+                            }
+                            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                MusicNoteIcon(size = coverSize * 0.42f, color = Muted40)
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.width(vwDp(width, 3.2f)))
                 Column(modifier = Modifier.width(infoWidth)) {
                     TrackTitle(width, title, sizeVw = 2.8f, start = true)
@@ -1153,37 +1357,12 @@ private fun ColumnScope.NowPlaying(
     // same column and style as the BOOST slider's labels so it reads as part
     // of the screen. Bright + filled dot = on; dim + hollow dot = off.
     // Always shown: switches between the cover layout (default) and the plain one.
-    run {
-        val tint = if (showCover) Muted60 else Muted35
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = vwDp(width, 2.6f), bottom = vwDp(width, 2.2f))
-                .width(vwDp(width, 5f))
-                .clip(RoundedCornerShape(vwDp(width, 0.8f)))
-                .clickable {
-                    showCover = !showCover
-                    prefs.edit().putBoolean("show_cover", showCover).apply()
-                }
-                .padding(vertical = vwDp(width, 0.8f)), // bigger tap area, nothing drawn
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            val dot = vwDp(width, 0.55f)
-            Box(
-                Modifier
-                    .size(dot)
-                    .clip(CircleShape)
-                    .then(if (showCover) Modifier.background(tint) else Modifier.border(1.dp, tint, CircleShape))
-            )
-            Spacer(Modifier.height(vwDp(width, 0.5f)))
-            Text(
-                "COVER",
-                color = tint,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = vwSp(width, 0.85f),
-                letterSpacing = vwSp(width, 0.08f)
-            )
-        }
+    CornerToggle(
+        width, "COVER", active = showCover,
+        modifier = Modifier.align(Alignment.BottomEnd).padding(end = vwDp(width, 2.6f), bottom = vwDp(width, 2.2f))
+    ) {
+        showCover = !showCover
+        prefs.edit().putBoolean("show_cover", showCover).apply()
     }
   }
 }

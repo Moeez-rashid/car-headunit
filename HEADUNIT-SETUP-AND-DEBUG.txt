@@ -1,7 +1,7 @@
 CAR HEAD UNIT APPS - SETUP, TESTING AND DEBUGGING GUIDE
 ========================================================
 Version of this guide: 2026-11-23
-Apps covered: CarDash v21 and CarNav v0.4.3
+Apps covered: CarDash v22 and CarNav v0.4.3
 Source code: https://github.com/Moeez-rashid/car-headunit (public)
 
 
@@ -35,14 +35,18 @@ HEAD UNIT
   - Its own Bluetooth music app is com.autochips.bluetooth
     (screen: com.autochips.bluetooth.BtMusicActivity).
 
-CARDASH  (package: com.moeez.cardash, file: cardash-v21.apk)
+CARDASH  (package: com.moeez.cardash, file: cardash-v22.apk)
   - Replaces the home screen (it is a "launcher" / Home app).
   - Idle screen: big clock, NAVIGATION button (opens CarNav), MUSIC button.
   - Music screen (default): album cover box on the left, title / artist /
     progress bar / previous-play-next on the right, vertical BOOST slider at
     the right edge. The cover box shows a music-note icon until a cover is
-    found online (or if none exists). The small "COVER" label in the
-    bottom-right corner switches to the plain centred screen and back.
+    found online (or if none exists); while a cover is being looked up the
+    box pulses softly. The small "COVER" label in the bottom-right corner
+    switches to the plain centred screen and back.
+  - "EQ" label bottom-left of the music screen opens the equalizer:
+    BASS / MID / TREBLE (-12..+12 dB) and BASS BOOST (0..100%), applied to the
+    whole car audio and remembered. Log lines: "EQ ok: bass=..".
   - When a phone connects over Bluetooth, CarDash briefly (about 3 seconds)
     opens the car's own Bluetooth music app so song titles start flowing,
     then comes back. It never starts music by itself.
@@ -83,7 +87,7 @@ On the Windows laptop:
      Check it works:   adb version
   b) The two APK files (copy them from the MacBook's Downloads folder by
      USB stick, Google Drive, WhatsApp to self, etc.):
-       cardash-v21.apk
+       cardash-v22.apk
        carnav-v0.4.3.apk
      Put them in the same folder as adb.exe to keep commands short.
      Do NOT use: app-debug.apk (old CarDash), carnav-v0.3.apk,
@@ -120,7 +124,7 @@ Expected: one line with a serial number and the word "device".
 ------------------------------------------------------------------------
 4. INSTALL (ORDER MATTERS: CARDASH FIRST, THEN CARNAV)
 ------------------------------------------------------------------------
-  adb install -r cardash-v21.apk
+  adb install -r cardash-v22.apk
   adb install -r carnav-v0.4.3.apk
 
 Each must print "Success". "-r" means update in place and keep settings.
@@ -293,7 +297,7 @@ crash block are enough.
 9. BUG REPORT TEMPLATE (fill this in and give it to the owner for Claude)
 ------------------------------------------------------------------------
 --- BUG REPORT FOR CLAUDE ---
-App: CarDash v21 / CarNav v0.4   (pick one)
+App: CarDash v22 / CarNav v0.4   (pick one)
 Test ID from section 6 (e.g. C4):
 What I did, step by step:
 What I expected:
@@ -331,7 +335,9 @@ To free memory:
     background. Nothing in use depends on them (Play Store, Google Maps,
     YouTube and Chrome were already disabled).
   - UNINSTALLED: Uptodown, Google Maps Go, Street View, OpenLauncher,
-    Music Volume EQ (hr.podlanica) and MapFactor Navigator. This freed
+    Music Volume EQ (hr.podlanica) and MapFactor Navigator.
+    NOTE: Music Volume EQ had been adding bass/loudness from boot; removing it
+    made the sound weaker. CarDash v22 has its own EQ (see section 1) instead. This freed
     about 0.8 GB of storage.
 Undo (if an app ever complains about missing Google Play Services):
   adb shell pm enable com.google.android.gms
