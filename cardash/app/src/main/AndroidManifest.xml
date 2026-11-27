@@ -21,6 +21,7 @@
         android:protectionLevel="signature" />
 
     <application
+        android:name=".CarDashApp"
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="CarDash"

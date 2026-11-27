@@ -1,7 +1,7 @@
 CAR HEAD UNIT APPS - SETUP, TESTING AND DEBUGGING GUIDE
 ========================================================
 Version of this guide: 2026-11-23
-Apps covered: CarDash v22 and CarNav v0.4.3
+Apps covered: CarDash v23 and CarNav v0.4.3
 Source code: https://github.com/Moeez-rashid/car-headunit (public)
 
 
@@ -35,7 +35,7 @@ HEAD UNIT
   - Its own Bluetooth music app is com.autochips.bluetooth
     (screen: com.autochips.bluetooth.BtMusicActivity).
 
-CARDASH  (package: com.moeez.cardash, file: cardash-v22.apk)
+CARDASH  (package: com.moeez.cardash, file: cardash-v23.apk)
   - Replaces the home screen (it is a "launcher" / Home app).
   - Idle screen: big clock, NAVIGATION button (opens CarNav), MUSIC button.
   - Music screen (default): album cover box on the left, title / artist /
@@ -57,6 +57,14 @@ CARDASH  (package: com.moeez.cardash, file: cardash-v22.apk)
     Log lines: "Online cover for ...: found / no confident match / lookup failed".
   - Needs: "Notification access" (to read song info), and optionally
     "Usage access" (so it knows if you left the Bluetooth app yourself).
+  - The unit's firmware force-stops CarDash at every car power-off and puts
+    its stock launcher (com.android.launcher3 .testing.LauncherExtension) in
+    front. CarDash (v23+) restarts with its process, re-applies BOOST/EQ and
+    brings itself back in front ("Wake check ..." log lines). Needs usage
+    access: adb shell appops set com.moeez.cardash GET_USAGE_STATS allow
+  - The unit's log buffer is tiny (256 KB) and fills in seconds: to catch
+    CarDash lines, stream them live while reproducing:
+        adb logcat -s CarDash > cardash_live.txt
   - Log tag in logcat: CarDash
 
 CARNAV  (package: com.moeez.carnav, file: carnav-v0.4.3.apk)
@@ -87,7 +95,7 @@ On the Windows laptop:
      Check it works:   adb version
   b) The two APK files (copy them from the MacBook's Downloads folder by
      USB stick, Google Drive, WhatsApp to self, etc.):
-       cardash-v22.apk
+       cardash-v23.apk
        carnav-v0.4.3.apk
      Put them in the same folder as adb.exe to keep commands short.
      Do NOT use: app-debug.apk (old CarDash), carnav-v0.3.apk,
@@ -124,7 +132,7 @@ Expected: one line with a serial number and the word "device".
 ------------------------------------------------------------------------
 4. INSTALL (ORDER MATTERS: CARDASH FIRST, THEN CARNAV)
 ------------------------------------------------------------------------
-  adb install -r cardash-v22.apk
+  adb install -r cardash-v23.apk
   adb install -r carnav-v0.4.3.apk
 
 Each must print "Success". "-r" means update in place and keep settings.
@@ -297,7 +305,7 @@ crash block are enough.
 9. BUG REPORT TEMPLATE (fill this in and give it to the owner for Claude)
 ------------------------------------------------------------------------
 --- BUG REPORT FOR CLAUDE ---
-App: CarDash v22 / CarNav v0.4   (pick one)
+App: CarDash v23 / CarNav v0.4   (pick one)
 Test ID from section 6 (e.g. C4):
 What I did, step by step:
 What I expected:
@@ -337,7 +345,7 @@ To free memory:
   - UNINSTALLED: Uptodown, Google Maps Go, Street View, OpenLauncher,
     Music Volume EQ (hr.podlanica) and MapFactor Navigator.
     NOTE: Music Volume EQ had been adding bass/loudness from boot; removing it
-    made the sound weaker. CarDash v22 has its own EQ (see section 1) instead. This freed
+    made the sound weaker. CarDash v23 has its own EQ (see section 1) instead. This freed
     about 0.8 GB of storage.
 Undo (if an app ever complains about missing Google Play Services):
   adb shell pm enable com.google.android.gms
